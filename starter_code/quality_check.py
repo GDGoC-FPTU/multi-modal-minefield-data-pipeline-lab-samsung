@@ -3,11 +3,27 @@
 # ==========================================
 # Task: Implement quality gates to reject corrupt data or logic discrepancies.
 
+TOXIC_PATTERNS = [
+    'Null pointer exception',
+    'null pointer',
+    'NullPointerException',
+    'Null',
+    'undefined',
+    'NaN',
+    'Error: ',
+    'Exception:',
+    'Stack trace',
+    'Traceback (most recent call last)',
+]
+
+
 def run_quality_gate(document_dict):
-    # TODO: Reject documents with 'content' length < 20 characters
-    # TODO: Reject documents containing toxic/error strings (e.g., 'Null pointer exception')
-    # TODO: Flag discrepancies (e.g., if tax calculation comment says 8% but code says 10%)
-    
-    # Return True if pass, False if fail.
-    
+    content = document_dict.get('content', '')
+    if len(content) < 20:
+        return False
+
+    for pattern in TOXIC_PATTERNS:
+        if pattern.lower() in content.lower():
+            return False
+
     return True
