@@ -1,45 +1,49 @@
 import re
+from schema import UnifiedDocument
 from datetime import datetime
 
-
-# ==========================================
-# ROLE 2: ETL/ELT BUILDER
-# ==========================================
-# Task: Clean the transcript text and extract key information.
 
 def clean_transcript(file_path):
     with open(file_path, 'r', encoding='utf-8') as f:
         text = f.read()
 
-    noise_pattern = re.compile(
-        r'\[Music\s*(starts|ends)?\]|\[Music\]|\[inaudible\]|\[Laughter\]|\[Speaker\s*\d?\]',
-        re.IGNORECASE
+    # Remove timestamp tokens [00:00:00]
+    text = re.sub(r'\[\d{2}:\d{2}:\d{2}\]', '', text)
+
+    # Remove noise tokens
+    noise_patterns = [
+        r'\[Music starts?\]',
+        r'\[Music ends?\]',
+        r'\[Music\]',
+        r'\[inaudible\]',
+        r'\[Laughter\]',
+        r'\[[^\]]*\]',  # Generic fallback: remove any remaining [bracketed]
+    ]
+    for pattern in noise_patterns:
+        text = re.sub(pattern, '', text)
+
+    # Collapse multiple spaces
+    text = re.sub(r' +', ' ', text)
+    text = text.strip()
+
+    # Extract price: "năm trăm nghìn VND" = 500,000 VND
+    price_match = re.search(
+        r'(?:năm|năm\s+)trăm\s+nghìn',
+        text, re.IGNORECASE
     )
-    cleaned = noise_pattern.sub('', text)
-    cleaned = re.sub(r'\[\d{2}:\d{2}:\d{2}\]', '', cleaned)
-    cleaned = re.sub(r'\s+', ' ', cleaned).strip()
+    detected_price_vnd = None
+    if price_match:
+        detected_price_vnd = 500000
 
-    vietnamese_price_map = {
-        'một trăm': 100000, 'hai trăm': 200000, 'ba trăm': 300000,
-        'bốn trăm': 400000, 'năm trăm': 500000, 'sáu trăm': 600000,
-        'bảy trăm': 700000, 'tám trăm': 800000, 'chín trăm': 900000,
-    }
-    detected_price = None
-    for word, value in vietnamese_price_map.items():
-        if word in cleaned.lower() and 'nghìn' in cleaned.lower():
-            detected_price = value
-            break
-
-    doc = {
-        'document_id': 'video-transcript-001',
-        'content': cleaned,
-        'source_type': 'Video',
-        'author': 'Unknown',
-        'timestamp': None,
-        'source_metadata': {
-            'detected_price_vnd': detected_price if detected_price else 0,
-            'topic': 'Data Pipeline Engineering',
-            'original_language': 'Vietnamese',
+    doc = UnifiedDocument(
+        document_id="transcript-001",
+        content=text,
+        source_type="Video",
+        author="Speaker 1",
+        timestamp=datetime.now().isoformat(),
+        source_metadata={
+            "original_file": "demo_transcript.txt",
+            "detected_price_vnd": detected_price_vnd,
         }
-    }
-    return doc
+    )
+    return doc.model_dump(mode='json')

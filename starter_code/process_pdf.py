@@ -1,11 +1,11 @@
-from google import genai
+import google.generativeai as genai
 import os
 import json
-import re
 from dotenv import load_dotenv
+from schema import UnifiedDocument
 
 load_dotenv()
-client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 
 
 def extract_pdf_data(file_path):
@@ -13,9 +13,11 @@ def extract_pdf_data(file_path):
         print(f"Error: File not found at {file_path}")
         return None
 
+    model = genai.GenerativeModel('gemini-2.5-flash')
+
     print(f"Uploading {file_path} to Gemini...")
     try:
-        pdf_file = client.files.upload(file=file_path)
+        pdf_file = genai.upload_file(path=file_path)
     except Exception as e:
         print(f"Failed to upload file to Gemini: {e}")
         return None
@@ -34,51 +36,30 @@ Output exactly as a JSON object matching this exact format:
 """
 
     print("Generating content from PDF using Gemini...")
-    response = client.models.generate_content(
-        model='gemini-2.5-flash',
-        contents=[pdf_file, prompt]
-    )
-    content_text = response.text
+    try:
+        response = model.generate_content([pdf_file, prompt])
+        content_text = response.text
+    except Exception as e:
+        print(f"Failed to generate content from PDF: {e}")
+        return None
 
-    # Strip markdown code fences
-    content_text = content_text.strip()
     if content_text.startswith("```json"):
         content_text = content_text[7:]
-    elif content_text.startswith("```"):
-        content_text = content_text[3:]
     if content_text.endswith("```"):
         content_text = content_text[:-3]
-    content_text = content_text.strip()
+    if content_text.startswith("```"):
+        content_text = content_text[3:]
 
-    # Try to extract a JSON object by finding balanced braces
     try:
-        extracted_data = json.loads(content_text)
-    except json.JSONDecodeError:
-        # Fallback: find the first { and last } to extract the JSON object
-        start = content_text.find('{')
-        end = content_text.rfind('}') + 1
-        if start != -1 and end > start:
-            json_str = content_text[start:end]
-            try:
-                extracted_data = json.loads(json_str)
-            except json.JSONDecodeError:
-                # Last resort: use regex to extract known fields
-                extracted_data = {
-                    "document_id": "pdf-doc-001",
-                    "content": content_text,
-                    "source_type": "PDF",
-                    "author": "Unknown",
-                    "timestamp": None,
-                    "source_metadata": {"original_file": os.path.basename(file_path)}
-                }
-        else:
-            extracted_data = {
-                "document_id": "pdf-doc-001",
-                "content": content_text,
-                "source_type": "PDF",
-                "author": "Unknown",
-                "timestamp": None,
-                "source_metadata": {"original_file": os.path.basename(file_path)}
-            }
+        extracted_data = json.loads(content_text.strip())
+    except json.JSONDecodeError as e:
+        print(f"Failed to parse JSON from Gemini response: {e}")
+        print(f"Raw response: {content_text}")
+        return None
 
-    return extracted_data
+    try:
+        doc = UnifiedDocument(**extracted_data)
+        return doc.model_dump(mode='json')
+    except Exception as e:
+        print(f"Failed to validate extracted data against schema: {e}")
+        return extracted_data
