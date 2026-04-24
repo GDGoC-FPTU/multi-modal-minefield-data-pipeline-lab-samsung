@@ -1,5 +1,5 @@
 **Thanh vien:**
-| Tên | Vai trò | MSSV |Email github|
+| Tên | Vai trò | MSSV |Email (username) github|
 |-----|---------|------|---------|
 | Nguyễn Anh Quân | Role 1 |2A202600132 |quankosimp|
 | Võ Thiên Phú | Role 2| 2A202600336 |phuvo05kid@gmail.com|
