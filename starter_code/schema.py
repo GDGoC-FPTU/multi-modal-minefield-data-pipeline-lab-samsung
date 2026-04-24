@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional, List
 from datetime import datetime
 
@@ -9,14 +9,24 @@ from datetime import datetime
 # This is v1. Note: A breaking change is coming at 11:00 AM!
 
 class UnifiedDocument(BaseModel):
-    # TODO: Define the v1 schema. 
-    # Suggested fields: document_id, content, source_type, author, timestamp, metadata
-    
     document_id: str
     content: str
-    source_type: str # e.g., 'PDF', 'Video', 'HTML', 'CSV', 'Code'
+    source_type: str  # e.g., 'PDF', 'Video', 'HTML', 'CSV', 'Code'
     author: Optional[str] = "Unknown"
     timestamp: Optional[datetime] = None
-    
-    # You might want a dict for source-specific metadata
     source_metadata: dict = Field(default_factory=dict)
+
+    @field_validator('source_type')
+    @classmethod
+    def validate_source_type(cls, v):
+        allowed = {'PDF', 'Video', 'HTML', 'CSV', 'Code'}
+        if v not in allowed:
+            raise ValueError(f'source_type must be one of {allowed}')
+        return v
+
+    @field_validator('content')
+    @classmethod
+    def validate_content(cls, v):
+        if not v or not v.strip():
+            raise ValueError('content cannot be empty')
+        return v
